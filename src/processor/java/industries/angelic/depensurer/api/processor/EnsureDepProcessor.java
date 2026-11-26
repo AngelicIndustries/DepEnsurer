@@ -234,6 +234,10 @@ public class EnsureDepProcessor extends AbstractProcessor {
         } else if (primary && sha1.isEmpty()) {
             check.warning("has no sha1: the full build won't download it");
         }
+        if (!sha1.isEmpty() && file.isEmpty() && modId.isEmpty() && !hasNarrowInclude(include)) {
+            check.warning(
+                "has no file name, modId or include narrower than assets/**: Dep Ensurer has to hash every jar to find it");
+        }
         if (hasCurseForge && file.isEmpty()) {
             check.warning("has a CurseForge file but no file name: the full build can't use the CurseForge CDN");
         }
@@ -273,6 +277,30 @@ public class EnsureDepProcessor extends AbstractProcessor {
                 .name());
         json.put("optional", dep.optional());
         return json;
+    }
+
+    /** Same rule as Dep Ensurer's Glob.isSpecific: the literal start of a glob names two folders or more. */
+    private static boolean hasNarrowInclude(List<String> include) {
+        for (String glob : include) {
+            int wildcard = glob.length();
+            for (int i = 0; i < glob.length(); i++) {
+                if (glob.charAt(i) == '*' || glob.charAt(i) == '?') {
+                    wildcard = i;
+                    break;
+                }
+            }
+            String root = wildcard == glob.length() ? glob : glob.substring(0, glob.lastIndexOf('/', wildcard) + 1);
+            int segments = 0;
+            for (String segment : root.split("/")) {
+                if (!segment.isEmpty()) {
+                    segments++;
+                }
+            }
+            if (segments >= 2) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<String> paths(Checker check, String field, String[] values) {

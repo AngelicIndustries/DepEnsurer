@@ -26,3 +26,50 @@ tasks.named<Jar>("apiJar").configure {
 dependencies {
     "testImplementation"(processorSourceSet.output)
 }
+
+// Test jars for dev and harness runs, never published: a mod declaring an asset source, and a stand-in source
+// whose coremod and mod throw if FML ever loads them. ./gradlew testJars puts both in build/testmods.
+fun testSourceSet(name: String) = sourceSets.create(name) {
+    compileClasspath = mainSourceSet.compileClasspath + mainSourceSet.output
+    runtimeClasspath = output + compileClasspath
+}.also { sourceSet ->
+    tasks.named<JavaCompile>(sourceSet.compileJavaTaskName).configure {
+        val mainCompile = tasks.named<JavaCompile>("compileJava").get()
+        sourceCompatibility = mainCompile.sourceCompatibility
+        targetCompatibility = mainCompile.targetCompatibility
+        options.encoding = "UTF-8"
+        options.annotationProcessorPath = configurations.named("annotationProcessor").get()
+    }
+}
+
+val testModSourceSet = testSourceSet("testmod")
+val testTargetSourceSet = testSourceSet("testtarget")
+
+tasks.named<JavaCompile>(testModSourceSet.compileJavaTaskName).configure {
+    options.annotationProcessorPath = files(processorSourceSet.output, mainSourceSet.output) +
+        configurations.named("annotationProcessor").get()
+}
+
+val testModJar = tasks.register<Jar>("testModJar") {
+    from(testModSourceSet.output)
+    archiveFileName.set("depensurer-testmod.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("testmods"))
+}
+
+val testTargetJar = tasks.register<Jar>("testTargetJar") {
+    from(testTargetSourceSet.output)
+    archiveFileName.set("depensurer-testtarget.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("testmods"))
+    manifest {
+        attributes(
+            "FMLCorePlugin" to "depensurer.testtarget.TestTargetCore",
+            "FMLCorePluginContainsFMLMod" to "true",
+        )
+    }
+}
+
+tasks.register("testJars") {
+    group = "verification"
+    description = "Builds the test mod and test target jars into build/testmods."
+    dependsOn(testModJar, testTargetJar)
+}

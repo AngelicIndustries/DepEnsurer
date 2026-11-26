@@ -32,7 +32,7 @@ public @interface EnsureDep {
 
     /**
      * Loose match for jars the player or a launcher installed: the mod id in mcmod.info, mods.toml, neoforge.mods.toml
-     * or fabric.mod.json.
+     * or fabric.mod.json. With {@link #neutralize()}, every jar with this mod id is disabled, whatever its version.
      */
     String modId() default "";
 

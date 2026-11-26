@@ -241,6 +241,7 @@ public class EnsureDepProcessorTest {
         assertTrue(c.errorsAndWarnings(), c.hasWarning("\"unverified\") on Warnings has no sha1"));
         assertTrue(c.errorsAndWarnings(), c.hasWarning("\"cdn\") on Warnings has a CurseForge file but no file name"));
         assertTrue(c.errorsAndWarnings(), c.hasWarning("\"cdn\") on Warnings curseforge has no slug"));
-        assertEquals(c.errorsAndWarnings(), 4, c.warnings.size());
+        assertTrue(c.errorsAndWarnings(), c.hasWarning("\"cdn\") on Warnings has no file name, modId or include"));
+        assertEquals(c.errorsAndWarnings(), 5, c.warnings.size());
     }
 }
