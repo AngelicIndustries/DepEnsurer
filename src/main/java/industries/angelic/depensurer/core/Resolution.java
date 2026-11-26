@@ -39,6 +39,11 @@ public final class Resolution {
         current = resolution;
     }
 
+    /** For when the coremod never ran, which means the jar's manifest lost its FMLCorePlugin entry. */
+    public static Resolution notRun() {
+        return failed(new IllegalStateException("Dep Ensurer's coremod didn't run"));
+    }
+
     static Resolution failed(Throwable t) {
         return new Resolution(
             Collections.<ModDeclaration>emptyList(),

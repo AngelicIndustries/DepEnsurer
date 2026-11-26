@@ -1,6 +1,7 @@
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.tasks.Jar
+import com.gtnewhorizons.retrofuturagradle.mcp.ReobfuscatedJar
 
 // The @EnsureDep annotation processor ships only in the api jar, so the mod jar carries no compiler classes.
 val sourceSets = extensions.getByType<SourceSetContainer>()
@@ -28,7 +29,8 @@ dependencies {
 }
 
 // Test jars for dev and harness runs, never published: a mod declaring an asset source, and a stand-in source
-// whose coremod and mod throw if FML ever loads them. ./gradlew testJars puts both in build/testmods.
+// whose coremod and mod throw if FML ever loads them. ./gradlew testJars puts both in build/testmods, the test mod
+// reobfuscated for real clients and as a dev jar in build/testmods/dev for runServer.
 fun testSourceSet(name: String) = sourceSets.create(name) {
     compileClasspath = mainSourceSet.compileClasspath + mainSourceSet.output
     runtimeClasspath = output + compileClasspath
@@ -53,6 +55,11 @@ tasks.named<JavaCompile>(testModSourceSet.compileJavaTaskName).configure {
 val testModJar = tasks.register<Jar>("testModJar") {
     from(testModSourceSet.output)
     archiveFileName.set("depensurer-testmod.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("testmods/dev"))
+}
+
+val reobfTestModJar = tasks.named<ReobfuscatedJar>("reobfTestModJar") {
+    archiveFileName.set("depensurer-testmod.jar")
     destinationDirectory.set(layout.buildDirectory.dir("testmods"))
 }
 
@@ -71,5 +78,5 @@ val testTargetJar = tasks.register<Jar>("testTargetJar") {
 tasks.register("testJars") {
     group = "verification"
     description = "Builds the test mod and test target jars into build/testmods."
-    dependsOn(testModJar, testTargetJar)
+    dependsOn(reobfTestModJar, testTargetJar)
 }

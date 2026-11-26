@@ -282,6 +282,7 @@ public final class CoreScan {
                 continue;
             }
             boolean late = examinedBeforeUs(candidate) && candidate.info.earlyHooks;
+            String name = candidate.file.getName();
             String what = relative(candidate.file);
             try {
                 File target = new File(candidate.file.getParentFile(), candidate.file.getName() + DISABLED);
@@ -321,7 +322,7 @@ public final class CoreScan {
                 problems.add(
                     new Problem(
                         Problem.Kind.LATE,
-                        "Forge loaded " + candidate.file.getName()
+                        "Forge loaded " + name
                             + " before Dep Ensurer could disable it. Dep Ensurer has disabled it now; restart the game. "
                             + "If this happens every time, make sure Dep Ensurer's jar name starts with +.",
                         candidate.file));

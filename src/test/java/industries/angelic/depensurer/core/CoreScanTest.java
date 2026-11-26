@@ -212,6 +212,9 @@ public class CoreScanTest {
         assertFalse(coremod.exists());
         assertTrue(r.restartNeeded());
         assertEquals(Resolution.Problem.Kind.LATE, r.problems.get(0).kind);
+        assertTrue(
+            r.problems.get(0).message,
+            r.problems.get(0).message.startsWith("Forge loaded aether-core.jar before"));
     }
 
     @Test

@@ -1,0 +1,10 @@
+depensurer.missing.title=Dep Ensurer has found a problem with your Minecraft installation
+depensurer.missing.files=The files listed below are needed. Download them, put them in the mods folder and restart the game.
+depensurer.missing.restart=Restart the game.
+depensurer.missing.neededBy=needed by %s
+depensurer.missing.wrongVersion=wrong version installed: %s
+depensurer.missing.noLink=no download page known
+depensurer.missing.more=and %s more, listed in logs/fml-client-latest.log
+depensurer.missing.log=The file 'logs/fml-client-latest.log' contains more information
+depensurer.missing.openMods=Open mods folder
+depensurer.missing.quit=Quit game

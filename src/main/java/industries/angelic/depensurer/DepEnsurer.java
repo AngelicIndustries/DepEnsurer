@@ -1,14 +1,25 @@
 package industries.angelic.depensurer;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.Mod;
+import cpw.mods.fml.common.ModContainer;
+import cpw.mods.fml.common.ModMetadata;
 import cpw.mods.fml.common.SidedProxy;
+import cpw.mods.fml.common.discovery.ASMDataTable;
 import cpw.mods.fml.common.event.FMLConstructionEvent;
+import cpw.mods.fml.relauncher.Side;
+import industries.angelic.depensurer.api.EnsureDep;
+import industries.angelic.depensurer.api.EnsureDeps;
+import industries.angelic.depensurer.core.Resolution;
+import industries.angelic.depensurer.declaration.ModDeclaration;
 
 @Mod(
     modid = DepEnsurer.MODID,
@@ -45,7 +56,67 @@ public class DepEnsurer {
             MODID + ".cfg");
         Config.loadConfig(confFile);
         debug("Debug mode on");
-        proxy.construct(event);
+
+        Resolution resolution = Resolution.current();
+        if (resolution == null) {
+            resolution = Resolution.notRun();
+        }
+        checkAnnotations(event.getASMHarvestedData(), resolution);
+        describe(resolution);
+        Report report = Report.of(resolution, event.getSide() == Side.SERVER, DepEnsurer::modName);
+        if (!report.isEmpty()) {
+            for (String line : report.lines()) {
+                LOG.error(line);
+            }
+            proxy.fail(report);
+        }
+        proxy.serve(resolution);
+    }
+
+    /** A mod with @EnsureDep but no depensurer.json was built without the annotation processor. */
+    private static void checkAnnotations(ASMDataTable asm, Resolution resolution) {
+        Set<String> declared = new HashSet<>();
+        for (ModDeclaration mod : resolution.declarations) {
+            declared.add(mod.className);
+        }
+        Set<String> reported = new HashSet<>();
+        for (String annotation : Arrays.asList(EnsureDep.class.getName(), EnsureDeps.class.getName())) {
+            for (ASMDataTable.ASMData data : asm.getAll(annotation)) {
+                String className = data.getClassName();
+                if (!declared.contains(className) && reported.add(className)) {
+                    LOG.error(
+                        "{} has @EnsureDep but its jar has no META-INF/depensurer.json, so Dep Ensurer ignores it. Its author has to add annotationProcessor(\"industries.angelic.depensurer:DepEnsurer:<version>:api\").",
+                        className);
+                }
+            }
+        }
+    }
+
+    /** Lists the jars in use in the mods list, so players can see what Dep Ensurer did. */
+    private static void describe(Resolution resolution) {
+        ModContainer self = Loader.instance()
+            .getIndexedModList()
+            .get(MODID);
+        if (self == null || resolution.resolved.isEmpty()) {
+            return;
+        }
+        ModMetadata metadata = self.getMetadata();
+        StringBuilder description = new StringBuilder(metadata.description == null ? "" : metadata.description);
+        description.append("\n\nAsset sources in use:");
+        for (Resolution.Resolved resolved : resolution.resolved) {
+            description.append("\n")
+                .append(modName(resolved.owner.modId))
+                .append(": ")
+                .append(resolved.file.getName());
+        }
+        metadata.description = description.toString();
+    }
+
+    private static String modName(String modId) {
+        ModContainer mod = Loader.instance()
+            .getIndexedModList()
+            .get(modId);
+        return mod == null ? modId : mod.getName();
     }
 
     public static void debug(String message) {
