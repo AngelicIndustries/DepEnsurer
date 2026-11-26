@@ -1,0 +1,21 @@
+{
+	"modListVersion": 2,
+	"modList": [{
+		"modid": "${modId}",
+		"name": "${modName}",
+		"description": "Lets mods use assets from other mods' jars without redistributing them. The player gets the jar from its official source, Dep Ensurer keeps it from loading and serves the assets.",
+		"version": "${modVersion}",
+		"mcversion": "${minecraftVersion}",
+		"url": "https://github.com/AngelicIndustries/DepEnsurer",
+		"updateUrl": "",
+		"authorList": ["Angelic Industries"],
+		"credits": "",
+		"logoFile": "",
+		"screenshots": [],
+		"parent": "",
+		"requiredMods": [],
+		"dependencies": [],
+		"dependants": [],
+		"useDependencyInformation": false
+	}]
+}
