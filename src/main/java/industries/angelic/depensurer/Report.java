@@ -33,9 +33,9 @@ public final class Report {
         return of(resolution, dedicatedServer, modNames, Collections.<Resolution.Missing, String>emptyMap());
     }
 
-    /** @param downloadErrors why the full build couldn't download a missing group */
+    /** @param notes a line per missing group to show the player, from the full build's downloader */
     public static Report of(Resolution resolution, boolean dedicatedServer, Function<String, String> modNames,
-        Map<Resolution.Missing, String> downloadErrors) {
+        Map<Resolution.Missing, String> notes) {
         List<Entry> missing = new ArrayList<>();
         for (Resolution.Missing m : resolution.missing) {
             DepDeclaration primary = m.primary;
@@ -62,7 +62,7 @@ public final class Report {
                     modNames.apply(m.owner.modId),
                     wrong,
                     links,
-                    downloadErrors.get(m)));
+                    notes.get(m)));
         }
         List<String> problems = new ArrayList<>();
         for (Resolution.Problem problem : resolution.problems) {
@@ -114,9 +114,9 @@ public final class Report {
                     line.append(", wrong version installed: ")
                         .append(String.join(", ", entry.wrongVersions));
                 }
-                if (entry.downloadError != null) {
-                    line.append(", download failed: ")
-                        .append(entry.downloadError);
+                if (entry.note != null) {
+                    line.append(", ")
+                        .append(entry.note);
                 }
                 for (Link link : entry.links) {
                     line.append(" | ")
@@ -137,17 +137,16 @@ public final class Report {
         public final String neededBy;
         public final List<String> wrongVersions;
         public final List<Link> links;
-        /** Why the full build couldn't download it; null when it didn't try. */
-        public final String downloadError;
+        /** A line from the full build's downloader, or null. */
+        public final String note;
 
-        Entry(String name, String file, String neededBy, List<String> wrongVersions, List<Link> links,
-            String downloadError) {
+        Entry(String name, String file, String neededBy, List<String> wrongVersions, List<Link> links, String note) {
             this.name = name;
             this.file = file;
             this.neededBy = neededBy;
             this.wrongVersions = Collections.unmodifiableList(wrongVersions);
             this.links = Collections.unmodifiableList(links);
-            this.downloadError = downloadError;
+            this.note = note;
         }
     }
 

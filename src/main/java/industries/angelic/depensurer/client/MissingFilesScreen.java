@@ -142,12 +142,8 @@ public class MissingFilesScreen extends GuiScreen {
                 null);
         }
         rows.add(neededBy);
-        if (entry.downloadError != null) {
-            wrap(
-                rows,
-                text("depensurer.missing.downloadFailed", "download failed: %s", entry.downloadError),
-                WARN,
-                maxWidth);
+        if (entry.note != null) {
+            wrap(rows, entry.note, WARN, maxWidth);
         }
 
         Row links = new Row(LINE);

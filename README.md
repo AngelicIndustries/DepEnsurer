@@ -26,7 +26,8 @@ None.
 
 ## Building
 
-`./gradlew build`
+`./gradlew build`. It builds both jars: `+depensurer-<version>.jar` and the CurseForge one,
+`+depensurer-<version>-curseforge.jar`, which has no downloader. `verifyCurseForgeJar` checks that.
 
 ## Credits
 

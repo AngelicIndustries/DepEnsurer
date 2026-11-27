@@ -16,15 +16,22 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
+import net.minecraft.launchwrapper.Launch;
 import net.minecraftforge.common.config.Configuration;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import cpw.mods.fml.common.ProgressManager;
+import industries.angelic.depensurer.DepEnsurer;
 import industries.angelic.depensurer.Fetcher;
 import industries.angelic.depensurer.Tags;
+import industries.angelic.depensurer.api.EnsureDep;
+import industries.angelic.depensurer.core.Locations;
+import industries.angelic.depensurer.core.Resolution;
 import industries.angelic.depensurer.declaration.DepDeclaration;
 
 /**
@@ -71,18 +78,77 @@ public class Downloader implements Fetcher {
             "Download missing asset source jars from Modrinth, CurseForge and the mirrors mods declare. When off, they're listed on the missing files screen instead. -Ddepensurer.offline=true also turns this off.");
     }
 
-    @Override
     public boolean enabled() {
         return allowDownloads && !Boolean.getBoolean("depensurer.offline");
     }
 
+    /**
+     * Downloads what's missing into the store, primary dep first, then its alternatives. Optional deps too; deps only
+     * the client needs are skipped on a dedicated server. One splash step per group.
+     */
     @Override
+    public Resolution fetchMissing(Resolution resolution, boolean dedicatedServer,
+        Map<Resolution.Missing, String> notes) {
+        if (!enabled()) {
+            return resolution;
+        }
+        List<Resolution.Missing> wanted = new ArrayList<>();
+        for (Resolution.Missing missing : resolution.missing) {
+            if (!dedicatedServer || missing.primary.side != EnsureDep.Side.CLIENT) {
+                wanted.add(missing);
+            }
+        }
+        if (wanted.isEmpty()) {
+            return resolution;
+        }
+        File gameDir = Launch.minecraftHome == null ? new File(".") : Launch.minecraftHome;
+        File store = Locations.store(gameDir);
+        // pop() throws unless every step was taken, so each group steps once whatever happens
+        ProgressManager.ProgressBar bar = ProgressManager.push("Dep Ensurer: downloading", wanted.size());
+        for (Resolution.Missing missing : wanted) {
+            bar.step(missing.primary.displayName());
+            String error = "nothing to download it from";
+            for (DepDeclaration dep : group(missing)) {
+                if (!canFetch(dep)) {
+                    continue;
+                }
+                try {
+                    File file = fetch(dep, store);
+                    resolution = resolution.withFound(missing, dep, file, true);
+                    DepEnsurer.LOG.info("{}/{}: downloaded {}", missing.owner.modId, dep.id, file);
+                    error = null;
+                    break;
+                } catch (Exception e) {
+                    error = e.getMessage() == null ? e.toString() : e.getMessage();
+                    DepEnsurer.LOG.warn("{}/{}: download failed: {}", missing.owner.modId, dep.id, error);
+                }
+            }
+            if (error != null) {
+                notes.put(missing, "download failed: " + error);
+            }
+        }
+        ProgressManager.pop(bar);
+        return resolution;
+    }
+
+    /** A missing group's deps, the primary first. */
+    private static List<DepDeclaration> group(Resolution.Missing missing) {
+        List<DepDeclaration> group = new ArrayList<>();
+        group.add(missing.primary);
+        for (DepDeclaration dep : missing.owner.deps) {
+            if (missing.primary.id.equals(dep.alternativeOf)) {
+                group.add(dep);
+            }
+        }
+        return group;
+    }
+
     public boolean canFetch(DepDeclaration dep) {
         return !dep.sha1.isEmpty()
             && (dep.modrinth != null || (dep.curseforge != null && !dep.file.isEmpty()) || !dep.urls.isEmpty());
     }
 
-    @Override
+    /** Downloads the dep's jar into the store and checks its sha1. Returns the jar. */
     public File fetch(DepDeclaration dep, File store) throws IOException {
         if (!store.isDirectory() && !store.mkdirs()) {
             throw new IOException("can't create " + store);
