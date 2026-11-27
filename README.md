@@ -2,6 +2,8 @@
 
 Lets Minecraft 1.7.10 mods use assets from other mods' jars without redistributing them.
 
+![logo](images/logo_small.png)
+
 [![hub](images/badges/github.png)](https://github.com/AngelicIndustries/DepEnsurer/releases)
 ![forge](images/badges/forge.png)
 [![cord](images/badges/cord.png)](https://discord.gg/xAWCqGrguG)
@@ -12,6 +14,8 @@ Lets Minecraft 1.7.10 mods use assets from other mods' jars without redistributi
 [![67](images/badges/67.png)](https://67minecraft.com/mod/dep-ensurer)
 [![maven](images/badges/maven.png)](https://maven.angelic.industries/#/releases/industries/angelic/depensurer/DepEnsurer)
 -->
+
+![missing files](images/screenshots/missing-files.png)
 
 ## Features
 

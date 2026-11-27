@@ -10,7 +10,7 @@
 		"updateUrl": "",
 		"authorList": ["Angelic Industries"],
 		"credits": "",
-		"logoFile": "",
+		"logoFile": "assets/${modId}/logo.png",
 		"screenshots": [],
 		"parent": "",
 		"requiredMods": [],

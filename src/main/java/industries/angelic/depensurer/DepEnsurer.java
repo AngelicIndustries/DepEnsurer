@@ -31,7 +31,8 @@ import industries.angelic.depensurer.declaration.ModDeclaration;
     acceptableRemoteVersions = "*",
     guiFactory = "industries.angelic.depensurer.gui.GuiFactory",
     customProperties = { @Mod.CustomProperty(k = "license", v = "LGPLv3"),
-        @Mod.CustomProperty(k = "issueTrackerUrl", v = "https://github.com/AngelicIndustries/DepEnsurer/issues") })
+        @Mod.CustomProperty(k = "issueTrackerUrl", v = "https://github.com/AngelicIndustries/DepEnsurer/issues"),
+        @Mod.CustomProperty(k = "iconFile", v = "assets/depensurer/logo.png") })
 public class DepEnsurer {
 
     public static final String MODID = "depensurer";
