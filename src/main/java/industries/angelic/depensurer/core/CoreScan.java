@@ -144,10 +144,13 @@ public final class CoreScan {
         return new ArrayList<>(byClass.values());
     }
 
+    /** First one wins, so a jar seen on the class path and in the mods folder counts once. */
     private static void add(Map<String, ModDeclaration> byClass, List<ModDeclaration> mods) {
         for (ModDeclaration mod : mods) {
-            if (!byClass.containsKey(mod.className)) {
-                byClass.put(mod.className, mod);
+            // Declarations from gradle.properties have no class
+            String key = mod.className.isEmpty() ? "mod " + mod.modId : mod.className;
+            if (!byClass.containsKey(key)) {
+                byClass.put(key, mod);
             }
         }
     }

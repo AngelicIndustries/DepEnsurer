@@ -20,6 +20,49 @@ Lets Minecraft 1.7.10 mods use assets from other mods' jars without redistributi
 * The CurseForge build only uses jars the CurseForge app or the player installed, and lists missing ones with download
   links. The other builds also download them.
 
+## Using it in a mod
+
+Depend on it with `required-after:depensurer` in `@Mod`, and declare the jars, either way:
+
+In `gradle.properties`, with the script applied in `build.gradle.kts`:
+
+```kotlin
+apply(from = "https://raw.githubusercontent.com/AngelicIndustries/DepEnsurer/${property("depensurer.version")}/depensurer.gradle.kts")
+```
+
+```properties
+depensurer.version = 0.0.1
+depensurer.deps = legacy
+depensurer.legacy.name = The Aether v1.1.2.3
+depensurer.legacy.file = aether-1.7.10-v1.1.2.3.jar
+depensurer.legacy.sha1 = d45466de894c24fb2c7895704509073ea97eaf69
+depensurer.legacy.modrinth = YhmgMVyu:4NuI8eHN
+depensurer.legacy.curseforge = 255308:aether-legacy:5028330
+depensurer.legacy.include = assets/aether_legacy/textures/**; assets/aether_legacy/sounds/**
+```
+
+Or with `@EnsureDep` on the `@Mod` class, adding the api jar as `compileOnly` and `annotationProcessor`
+(`industries.angelic.depensurer:DepEnsurer:<version>:api`):
+
+```java
+@EnsureDep(
+    id = "legacy",
+    name = "The Aether v1.1.2.3",
+    file = "aether-1.7.10-v1.1.2.3.jar",
+    sha1 = "d45466de894c24fb2c7895704509073ea97eaf69",
+    modrinth = @ModrinthFile(project = "YhmgMVyu", version = "4NuI8eHN"),
+    curseforge = @CurseForgeFile(project = 255308, slug = "aether-legacy", file = 5028330),
+    include = { "assets/aether_legacy/textures/**", "assets/aether_legacy/sounds/**" })
+```
+
+Fields: `name`, `file`, `sha1`, `modId` and `versions` (match any jar with that mod id and version), `alternativeOf`,
+`curseforge`, `modrinth`, `urls` (extra mirrors), `include` and `exclude` (globs, `assets/**` by default), `remap`
+(`from/ -> to/`), `neutralize` (default true), `side` (`CLIENT` or `BOTH`), `optional`. In properties, lists take
+commas or semicolons, `curseforge` is `project:slug:file` and `modrinth` is `project:version`. Both ways are checked
+at build time.
+
+`DepEnsurerAPI` gives mods the jar and its entries at runtime.
+
 ## Dependencies
 
 None.

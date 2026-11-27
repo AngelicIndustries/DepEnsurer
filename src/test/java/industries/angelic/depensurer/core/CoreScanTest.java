@@ -319,6 +319,25 @@ public class CoreScanTest {
     }
 
     @Test
+    public void countsADeclarationWithoutAClassOnce() throws Exception {
+        File target = target("aether.jar");
+        String json = "{\"schema\": 1, \"mods\": [{\"modId\": \"props\", \"class\": \"\", \"deps\": ["
+            + dep("legacy", sha1Of(target))
+            + "]}]}";
+        File declaring = new TestJars().entry("META-INF/depensurer.json", json)
+            .write(new File(mods, "props.jar"));
+
+        try (URLClassLoader loader = new URLClassLoader(
+            new URL[] { declaring.toURI()
+                .toURL() },
+            null)) {
+            Resolution r = new CoreScan(mods, Collections.singletonList(store), null, loader).run();
+            assertEquals(1, r.declarations.size());
+            assertNotNull(r.find("props", "legacy"));
+        }
+    }
+
+    @Test
     public void picksAFreeNameWhenADifferentDisabledFileHasTheName() throws Exception {
         File target = target("aether.jar");
         File earlier = new TestJars().mcmod("aether", "1.5")
