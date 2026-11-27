@@ -12,6 +12,15 @@ val depEnsurerVersion = providers.gradleProperty("depensurer.version").orElse("0
 val depEnsurerTool = configurations.create("depEnsurerTool") {
     isCanBeConsumed = false
     isTransitive = false
+    // The mod's own runtime attributes (Java runtime, RetroFuturaGradle's mcp names), so Gradle can pick one of
+    // Dep Ensurer's published variants; the :api classifier then picks the jar
+    val runtime = configurations.getByName("runtimeClasspath").attributes
+    attributes {
+        runtime.keySet().forEach { key ->
+            @Suppress("UNCHECKED_CAST")
+            attribute(key as Attribute<Any>, runtime.getAttribute(key)!!)
+        }
+    }
 }
 val localDepEnsurer = providers.gradleProperty("depEnsurerDir").orNull
 if (localDepEnsurer != null) {
