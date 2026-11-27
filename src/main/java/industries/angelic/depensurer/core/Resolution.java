@@ -1,6 +1,7 @@
 package industries.angelic.depensurer.core;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -39,6 +40,11 @@ public final class Resolution {
         current = resolution;
     }
 
+    /** For the mod phase, after downloads changed what's found. */
+    public static void update(Resolution resolution) {
+        current = resolution;
+    }
+
     /** For when the coremod never ran, which means the jar's manifest lost its FMLCorePlugin entry. */
     public static Resolution notRun() {
         return failed(new IllegalStateException("Dep Ensurer's coremod didn't run"));
@@ -52,6 +58,15 @@ public final class Resolution {
             Collections.singletonList(
                 new Problem(Problem.Kind.SCAN_FAILED, "Dep Ensurer's scan of the mods folder failed: " + t, null)),
             Collections.<String>emptyList());
+    }
+
+    /** A copy where a missing group is served by a jar found later, a download. */
+    public Resolution withFound(Missing found, DepDeclaration chosen, File file, boolean exact) {
+        List<Resolved> resolved = new ArrayList<>(this.resolved);
+        resolved.add(new Resolved(found.owner, found.primary, chosen, file, exact));
+        List<Missing> missing = new ArrayList<>(this.missing);
+        missing.remove(found);
+        return new Resolution(declarations, resolved, missing, problems, disabled);
     }
 
     public boolean restartNeeded() {

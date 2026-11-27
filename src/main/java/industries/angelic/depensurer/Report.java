@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 import industries.angelic.depensurer.api.EnsureDep;
@@ -29,6 +30,12 @@ public final class Report {
      * @param modNames        mod id to display name
      */
     public static Report of(Resolution resolution, boolean dedicatedServer, Function<String, String> modNames) {
+        return of(resolution, dedicatedServer, modNames, Collections.<Resolution.Missing, String>emptyMap());
+    }
+
+    /** @param downloadErrors why the full build couldn't download a missing group */
+    public static Report of(Resolution resolution, boolean dedicatedServer, Function<String, String> modNames,
+        Map<Resolution.Missing, String> downloadErrors) {
         List<Entry> missing = new ArrayList<>();
         for (Resolution.Missing m : resolution.missing) {
             DepDeclaration primary = m.primary;
@@ -48,7 +55,14 @@ public final class Report {
                     }
                 }
             }
-            missing.add(new Entry(primary.displayName(), primary.file, modNames.apply(m.owner.modId), wrong, links));
+            missing.add(
+                new Entry(
+                    primary.displayName(),
+                    primary.file,
+                    modNames.apply(m.owner.modId),
+                    wrong,
+                    links,
+                    downloadErrors.get(m)));
         }
         List<String> problems = new ArrayList<>();
         for (Resolution.Problem problem : resolution.problems) {
@@ -100,6 +114,10 @@ public final class Report {
                     line.append(", wrong version installed: ")
                         .append(String.join(", ", entry.wrongVersions));
                 }
+                if (entry.downloadError != null) {
+                    line.append(", download failed: ")
+                        .append(entry.downloadError);
+                }
                 for (Link link : entry.links) {
                     line.append(" | ")
                         .append(link.url);
@@ -119,13 +137,17 @@ public final class Report {
         public final String neededBy;
         public final List<String> wrongVersions;
         public final List<Link> links;
+        /** Why the full build couldn't download it; null when it didn't try. */
+        public final String downloadError;
 
-        Entry(String name, String file, String neededBy, List<String> wrongVersions, List<Link> links) {
+        Entry(String name, String file, String neededBy, List<String> wrongVersions, List<Link> links,
+            String downloadError) {
             this.name = name;
             this.file = file;
             this.neededBy = neededBy;
             this.wrongVersions = Collections.unmodifiableList(wrongVersions);
             this.links = Collections.unmodifiableList(links);
+            this.downloadError = downloadError;
         }
     }
 

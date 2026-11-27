@@ -95,7 +95,7 @@ public class MissingFilesScreen extends GuiScreen {
         List<Row> entries = new ArrayList<>();
         int shown = 0;
         for (Report.Entry entry : report.missing) {
-            List<Row> rows = entryRows(entry);
+            List<Row> rows = entryRows(entry, maxWidth);
             boolean last = shown == report.missing.size() - 1;
             if (used + height(rows) + (last ? 0 : LINE) > available) {
                 break;
@@ -120,7 +120,7 @@ public class MissingFilesScreen extends GuiScreen {
         return rows;
     }
 
-    private List<Row> entryRows(Report.Entry entry) {
+    private List<Row> entryRows(Report.Entry entry, int maxWidth) {
         List<Row> rows = new ArrayList<>();
         Row title = new Row(LINE);
         title.add(entry.name, TEXT, null);
@@ -142,6 +142,13 @@ public class MissingFilesScreen extends GuiScreen {
                 null);
         }
         rows.add(neededBy);
+        if (entry.downloadError != null) {
+            wrap(
+                rows,
+                text("depensurer.missing.downloadFailed", "download failed: %s", entry.downloadError),
+                WARN,
+                maxWidth);
+        }
 
         Row links = new Row(LINE);
         if (entry.links.isEmpty()) {

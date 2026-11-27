@@ -8,3 +8,4 @@ depensurer.missing.more=and %s more, listed in logs/fml-client-latest.log
 depensurer.missing.log=The file 'logs/fml-client-latest.log' contains more information
 depensurer.missing.openMods=Open mods folder
 depensurer.missing.quit=Quit game
+depensurer.missing.downloadFailed=download failed: %s

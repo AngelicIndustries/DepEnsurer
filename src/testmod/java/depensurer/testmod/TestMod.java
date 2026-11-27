@@ -34,9 +34,13 @@ import industries.angelic.depensurer.api.ModrinthFile;
     versions = "[1.0,2.0)",
     include = "assets/depensurertarget/**",
     remap = "assets/depensurertarget/ -> assets/depensurertest/",
-    // Placeholder pages, so the missing files screen has links to draw
+    sha1 = TestTargetHash.SHA1,
+    // Placeholder pages, so the missing files screen has links to draw. Point -Ddepensurer.modrinthApi and
+    // -Ddepensurer.curseForgeCdn somewhere local in download tests, or the full build asks the real services.
     curseforge = @CurseForgeFile(project = 1, slug = "depensurer-test-target", file = 1),
-    modrinth = @ModrinthFile(project = "depensurer-test-target", version = "1.0"))
+    modrinth = @ModrinthFile(project = "depensurer-test-target", version = "1.0"),
+    // Serve build/testmods here to test downloads: python3 -m http.server 8765 --bind 127.0.0.1
+    urls = "http://127.0.0.1:8765/depensurer-testtarget.jar")
 public class TestMod {
 
     private static final Logger LOG = LogManager.getLogger("DepEnsurerTest");

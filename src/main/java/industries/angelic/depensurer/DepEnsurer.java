@@ -1,9 +1,15 @@
 package industries.angelic.depensurer;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+
+import net.minecraft.launchwrapper.Launch;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -12,13 +18,16 @@ import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.ModContainer;
 import cpw.mods.fml.common.ModMetadata;
+import cpw.mods.fml.common.ProgressManager;
 import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.discovery.ASMDataTable;
 import cpw.mods.fml.common.event.FMLConstructionEvent;
 import cpw.mods.fml.relauncher.Side;
 import industries.angelic.depensurer.api.EnsureDep;
 import industries.angelic.depensurer.api.EnsureDeps;
+import industries.angelic.depensurer.core.Locations;
 import industries.angelic.depensurer.core.Resolution;
+import industries.angelic.depensurer.declaration.DepDeclaration;
 import industries.angelic.depensurer.declaration.ModDeclaration;
 
 @Mod(
@@ -62,8 +71,22 @@ public class DepEnsurer {
             resolution = Resolution.notRun();
         }
         checkAnnotations(event.getASMHarvestedData(), resolution);
+        boolean dedicated = event.getSide() == Side.SERVER;
+        Map<Resolution.Missing, String> downloadErrors = new HashMap<>();
+        Fetcher fetcher = Fetchers.find();
+        if (fetcher != null) {
+            fetcher.configure(Config.getRawConfig());
+            if (Config.getRawConfig()
+                .hasChanged()) {
+                Config.save();
+            }
+            if (fetcher.enabled()) {
+                resolution = fetchMissing(resolution, fetcher, dedicated, downloadErrors);
+                Resolution.update(resolution);
+            }
+        }
         describe(resolution);
-        Report report = Report.of(resolution, event.getSide() == Side.SERVER, DepEnsurer::modName);
+        Report report = Report.of(resolution, dedicated, DepEnsurer::modName, downloadErrors);
         if (!report.isEmpty()) {
             for (String line : report.lines()) {
                 LOG.error(line);
@@ -71,6 +94,62 @@ public class DepEnsurer {
             proxy.fail(report);
         }
         proxy.serve(resolution);
+    }
+
+    /**
+     * Downloads what's missing into the store, primary dep first, then its alternatives. Optional deps too; deps only
+     * the client needs are skipped on a dedicated server.
+     */
+    private static Resolution fetchMissing(Resolution resolution, Fetcher fetcher, boolean dedicated,
+        Map<Resolution.Missing, String> errors) {
+        List<Resolution.Missing> wanted = new ArrayList<>();
+        for (Resolution.Missing missing : resolution.missing) {
+            if (!dedicated || missing.primary.side != EnsureDep.Side.CLIENT) {
+                wanted.add(missing);
+            }
+        }
+        if (wanted.isEmpty()) {
+            return resolution;
+        }
+        File gameDir = Launch.minecraftHome == null ? new File(".") : Launch.minecraftHome;
+        File store = Locations.store(gameDir);
+        ProgressManager.ProgressBar bar = ProgressManager.push("Dep Ensurer: downloading", wanted.size());
+        for (Resolution.Missing missing : wanted) {
+            bar.step(missing.primary.displayName());
+            String error = "nothing to download it from";
+            for (DepDeclaration dep : group(missing)) {
+                if (!fetcher.canFetch(dep)) {
+                    continue;
+                }
+                try {
+                    File file = fetcher.fetch(dep, store);
+                    resolution = resolution.withFound(missing, dep, file, true);
+                    LOG.info("{}/{}: downloaded {}", missing.owner.modId, dep.id, file);
+                    error = null;
+                    break;
+                } catch (Exception e) {
+                    error = e.getMessage() == null ? e.toString() : e.getMessage();
+                    LOG.warn("{}/{}: download failed: {}", missing.owner.modId, dep.id, error);
+                }
+            }
+            if (error != null) {
+                errors.put(missing, error);
+            }
+        }
+        ProgressManager.pop(bar);
+        return resolution;
+    }
+
+    /** A missing group's deps, the primary first. */
+    private static List<DepDeclaration> group(Resolution.Missing missing) {
+        List<DepDeclaration> group = new ArrayList<>();
+        group.add(missing.primary);
+        for (DepDeclaration dep : missing.owner.deps) {
+            if (missing.primary.id.equals(dep.alternativeOf)) {
+                group.add(dep);
+            }
+        }
+        return group;
     }
 
     /** A mod with @EnsureDep but no depensurer.json was built without the annotation processor. */

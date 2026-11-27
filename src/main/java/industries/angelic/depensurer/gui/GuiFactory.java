@@ -53,11 +53,17 @@ public class GuiFactory implements IModGuiFactory {
             }
         }
 
+        /** Every category: the full build's downloader adds its own. */
         private static List<IConfigElement> createRootElements() {
-            return Lists.newArrayList(
-                new ConfigElement(
-                    Config.getRawConfig()
-                        .getCategory(Config.Categories.debug)));
+            List<IConfigElement> elements = Lists.newArrayList();
+            for (String name : Config.getRawConfig()
+                .getCategoryNames()) {
+                elements.add(
+                    new ConfigElement(
+                        Config.getRawConfig()
+                            .getCategory(name)));
+            }
+            return elements;
         }
     }
 }
