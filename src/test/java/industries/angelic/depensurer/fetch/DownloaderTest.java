@@ -31,6 +31,8 @@ import org.junit.rules.TemporaryFolder;
 import com.sun.net.httpserver.HttpServer;
 
 import industries.angelic.depensurer.api.EnsureDep;
+import industries.angelic.depensurer.core.CoreScan;
+import industries.angelic.depensurer.core.Resolution;
 import industries.angelic.depensurer.declaration.DepDeclaration;
 
 public class DownloaderTest {
@@ -87,7 +89,13 @@ public class DownloaderTest {
     }
 
     private Downloader downloader() {
-        return new Downloader(base + "/modrinth/", Arrays.asList(base + "/cdn"), new Http(Downloader.USER_AGENT));
+        return new Downloader(
+            base + "/modrinth/",
+            base + "/mrcdn",
+            Arrays.asList(base + "/cdn"),
+            new Http(Downloader.USER_AGENT),
+            store,
+            false);
     }
 
     private static DepDeclaration dep(String file, List<String> sha1, DepDeclaration.CurseForge curseforge,
@@ -157,6 +165,26 @@ public class DownloaderTest {
         assertArrayEquals(JAR, Files.readAllBytes(file.toPath()));
         assertEquals(
             Arrays.asList("/modrinth/project/p/version/v", "/cdn/2960/56/a%2Bb%20c.jar", "/mirror/x.jar"),
+            requested);
+    }
+
+    @Test
+    public void fallsBackToModrinthsCdnWhenTheApiLostTheVersion() throws Exception {
+        responses.put("/mrcdn/JD2NSu5O/versions/cZNxPTqa/aether_ii-1.12.2-0.3.0%2Bbuild411-universal.jar", JAR);
+
+        File file = downloader().fetch(
+            dep(
+                "aether_ii-1.12.2-0.3.0+build411-universal.jar",
+                Collections.singletonList(SHA1),
+                null,
+                new DepDeclaration.Modrinth("JD2NSu5O", "cZNxPTqa"),
+                Collections.<String>emptyList()),
+            store);
+        assertArrayEquals(JAR, Files.readAllBytes(file.toPath()));
+        assertEquals(
+            Arrays.asList(
+                "/modrinth/project/JD2NSu5O/version/cZNxPTqa",
+                "/mrcdn/JD2NSu5O/versions/cZNxPTqa/aether_ii-1.12.2-0.3.0%2Bbuild411-universal.jar"),
             requested);
     }
 
@@ -263,6 +291,72 @@ public class DownloaderTest {
             store);
         assertEquals(new File(store, "x-" + SHA1.substring(0, 8) + ".jar"), file);
         assertArrayEquals("unrelated".getBytes(StandardCharsets.UTF_8), Files.readAllBytes(other.toPath()));
+    }
+
+    /** A real scan of a mods folder whose only jar declares the given deps. */
+    private Resolution scan(String... deps) throws IOException {
+        File mods = temp.newFolder("mods");
+        try (java.util.zip.ZipOutputStream out = new java.util.zip.ZipOutputStream(
+            new java.io.FileOutputStream(new File(mods, "declaring.jar")))) {
+            out.putNextEntry(new java.util.zip.ZipEntry("META-INF/depensurer.json"));
+            out.write(
+                ("{\"schema\": 1, \"mods\": [{\"modId\": \"m\", \"class\": \"a.M\", \"deps\": ["
+                    + String.join(", ", deps)
+                    + "]}]}").getBytes(StandardCharsets.UTF_8));
+        }
+        return new CoreScan(mods, Collections.singletonList(store), null, null).run();
+    }
+
+    @Test
+    public void fetchesWhatsMissingAndNotesWhatItCouldnt() throws Exception {
+        responses.put("/mirror/x.jar", JAR);
+        Resolution before = scan(
+            "{\"id\": \"ok\", \"file\": \"x.jar\", \"sha1\": [\"" + SHA1
+                + "\"], \"urls\": [\""
+                + base
+                + "/mirror/x.jar\"]}",
+            "{\"id\": \"gone\", \"file\": \"y.jar\", \"sha1\": [\"" + SHA1
+                + "\"], \"urls\": [\""
+                + base
+                + "/mirror/y.jar\"]}",
+            "{\"id\": \"unchecked\", \"modId\": \"u\", \"urls\": [\"" + base + "/mirror/u.jar\"]}",
+            "{\"id\": \"local\", \"modId\": \"l\"}");
+        assertEquals(4, before.missing.size());
+
+        Map<Resolution.Missing, String> notes = new HashMap<>();
+        Resolution after = downloader().fetchMissing(before, false, notes);
+        assertEquals(new File(store, "x.jar"), after.find("m", "ok").file);
+        assertEquals(3, after.missing.size());
+        Map<String, String> byId = new HashMap<>();
+        for (Map.Entry<Resolution.Missing, String> note : notes.entrySet()) {
+            byId.put(note.getKey().primary.id, note.getValue());
+        }
+        assertEquals("download failed: 127.0.0.1: HTTP 404", byId.get("gone"));
+        assertEquals("not downloaded: the mod declares no sha1 to check a download against", byId.get("unchecked"));
+        assertEquals("not downloaded: the mod declares nowhere to download it from", byId.get("local"));
+    }
+
+    @Test
+    public void asksForNothingWhenNothingIsMissing() throws Exception {
+        Resolution before = scan();
+        Resolution after = downloader().fetchMissing(before, false, new HashMap<Resolution.Missing, String>());
+        assertTrue(after.missing.isEmpty());
+        assertEquals(Collections.<String>emptyList(), requested);
+    }
+
+    @Test
+    public void leavesClientOnlyDepsToTheClient() throws Exception {
+        responses.put("/mirror/x.jar", JAR);
+        Resolution before = scan(
+            "{\"id\": \"client\", \"file\": \"x.jar\", \"sha1\": [\"" + SHA1
+                + "\"], \"side\": \"CLIENT\", \"urls\": [\""
+                + base
+                + "/mirror/x.jar\"]}");
+        Map<Resolution.Missing, String> notes = new HashMap<>();
+        Resolution after = downloader().fetchMissing(before, true, notes);
+        assertEquals(1, after.missing.size());
+        assertTrue(notes.isEmpty());
+        assertEquals(Collections.<String>emptyList(), requested);
     }
 
     @Test

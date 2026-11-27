@@ -44,20 +44,34 @@ public class Downloader implements Fetcher {
         + " (+https://github.com/AngelicIndustries/DepEnsurer)";
     private static final String CATEGORY = "downloads";
 
+    private static final java.util.regex.Pattern MODRINTH_ID = java.util.regex.Pattern.compile("[A-Za-z0-9]{8}");
+
     private final String modrinthApi;
+    private final String modrinthCdn;
     private final List<String> curseForgeCdns;
     private final Http http;
+    /** Null: the game folder's store, see Locations. */
+    private final File store;
+    /** False in tests: FML's splash progress needs a running game. */
+    private final boolean splash;
     private boolean allowDownloads = true;
 
     public Downloader() {
         this(
             System.getProperty("depensurer.modrinthApi", "https://api.modrinth.com/v2"),
+            System.getProperty("depensurer.modrinthCdn", "https://cdn.modrinth.com/data"),
             curseForgeCdns(System.getProperty("depensurer.curseForgeCdn")),
-            new Http(USER_AGENT));
+            new Http(USER_AGENT),
+            null,
+            true);
     }
 
-    Downloader(String modrinthApi, List<String> curseForgeCdns, Http http) {
+    Downloader(String modrinthApi, String modrinthCdn, List<String> curseForgeCdns, Http http, File store,
+        boolean splash) {
+        this.store = store;
+        this.splash = splash;
         this.modrinthApi = trimSlash(modrinthApi);
+        this.modrinthCdn = trimSlash(modrinthCdn);
         this.curseForgeCdns = curseForgeCdns;
         this.http = http;
     }
@@ -101,17 +115,24 @@ public class Downloader implements Fetcher {
         if (wanted.isEmpty()) {
             return resolution;
         }
-        File gameDir = Launch.minecraftHome == null ? new File(".") : Launch.minecraftHome;
-        File store = Locations.store(gameDir);
+        File store = this.store;
+        if (store == null) {
+            store = Locations.store(Launch.minecraftHome == null ? new File(".") : Launch.minecraftHome);
+        }
         // pop() throws unless every step was taken, so each group steps once whatever happens
-        ProgressManager.ProgressBar bar = ProgressManager.push("Dep Ensurer: downloading", wanted.size());
+        ProgressManager.ProgressBar bar = splash ? ProgressManager.push("Dep Ensurer: downloading", wanted.size())
+            : null;
         for (Resolution.Missing missing : wanted) {
-            bar.step(missing.primary.displayName());
-            String error = "nothing to download it from";
+            if (bar != null) {
+                bar.step(missing.primary.displayName());
+            }
+            String error = null;
+            boolean tried = false;
             for (DepDeclaration dep : group(missing)) {
                 if (!canFetch(dep)) {
                     continue;
                 }
+                tried = true;
                 try {
                     File file = fetch(dep, store);
                     resolution = resolution.withFound(missing, dep, file, true);
@@ -123,12 +144,25 @@ public class Downloader implements Fetcher {
                     DepEnsurer.LOG.warn("{}/{}: download failed: {}", missing.owner.modId, dep.id, error);
                 }
             }
-            if (error != null) {
+            if (!tried) {
+                notes.put(missing, whyNotTried(group(missing)));
+            } else if (error != null) {
                 notes.put(missing, "download failed: " + error);
             }
         }
-        ProgressManager.pop(bar);
+        if (bar != null) {
+            ProgressManager.pop(bar);
+        }
         return resolution;
+    }
+
+    private static String whyNotTried(List<DepDeclaration> group) {
+        for (DepDeclaration dep : group) {
+            if (dep.sha1.isEmpty() && (dep.modrinth != null || dep.curseforge != null || !dep.urls.isEmpty())) {
+                return "not downloaded: the mod declares no sha1 to check a download against";
+            }
+        }
+        return "not downloaded: the mod declares nowhere to download it from";
     }
 
     /** A missing group's deps, the primary first. */
@@ -171,8 +205,10 @@ public class Downloader implements Fetcher {
                 sources.addAll(modrinthFiles(dep));
             } catch (IOException e) {
                 failures.add("Modrinth: " + describe(e));
+                modrinthCdnFile(dep, sources);
             } catch (RuntimeException e) {
                 failures.add("Modrinth: unexpected answer (" + e + ")");
+                modrinthCdnFile(dep, sources);
             }
         }
         if (dep.curseforge != null && !dep.file.isEmpty()) {
@@ -212,6 +248,27 @@ public class Downloader implements Fetcher {
             throw new IOException("version " + dep.modrinth.version + " has no file with a declared sha1");
         }
         return sources;
+    }
+
+    /**
+     * Modrinth's CDN keeps the files of versions an author removed from the project, which the API no longer knows.
+     * The path needs the project and version ids, not slugs, and the file name.
+     */
+    private void modrinthCdnFile(DepDeclaration dep, List<Source> sources) {
+        if (!dep.file.isEmpty() && MODRINTH_ID.matcher(dep.modrinth.project)
+            .matches()
+            && MODRINTH_ID.matcher(dep.modrinth.version)
+                .matches()) {
+            sources.add(
+                new Source(
+                    "Modrinth CDN",
+                    modrinthCdn + "/"
+                        + dep.modrinth.project
+                        + "/versions/"
+                        + dep.modrinth.version
+                        + "/"
+                        + encode(dep.file)));
+        }
     }
 
     private File download(String url, DepDeclaration dep, File store) throws IOException {
